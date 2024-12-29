@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR-коды</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 90%;
+            max-width: 1200px;
+        }
+        .qr-section {
+            text-align: center;
+            width: 45%;
+        }
+        .qr-section img {
+            width: 400px;
+            height: 400px;
+            border: 2px solid #ddd;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .qr-section h2 {
+            font-size: 20px;
+            color: #333;
+            margin-top: 15px;
+        }
+        .qr-section p {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="qr-section">
+            <img src="click-qr.jpg" alt="Click QR Code">
+            <h2>Оплата через Click</h2>
+            <p>Сканируйте QR-код, чтобы оплатить.</p>
+        </div>
+        <div class="qr-section">
+            <img src="telegram-qr.jpg" alt="Telegram Bot QR Code">
+            <h2>Добавить бота в Telegram</h2>
+            <p>Сканируйте QR-код, чтобы подключиться.</p>
+        </div>
+    </div>
+</body>
+</html>
