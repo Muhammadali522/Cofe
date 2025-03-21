@@ -1,87 +1,48 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# Словарь для хранения данных пользователей
 user_data = {}
-ADMIN_IDS = [1406491528, 6108824933]  # Укажите ID обоих администраторов
-
-
-
+ADMIN_IDS = [1406491528, 6108824933]  # Проверь ID админов!
+pending_messages = {}  # Хранение сообщений для отправки клиенту
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Приветствие и автоматический переход в меню"""
+    """Приветствие пользователя"""
     first_name = update.effective_user.first_name
     last_name = update.effective_user.last_name or "Фамилия не указана"
     user_id = update.effective_user.id
 
-    # Сохраняем данные пользователя
-    user_data[user_id] = {
-        'name': first_name,
-        'surname': last_name
-    }
-
-    # Приветствие
-    await update.message.reply_text(
-        f"👋 Привет, {first_name} {last_name}! Добро пожаловать в бота для заказа кофе ☕️!"
-    )
+    user_data[user_id] = {'name': first_name, 'surname': last_name}
+    await update.message.reply_text(f"👋 Привет, {first_name} {last_name}! Добро пожаловать в бота ☕️!")
     await show_menu(update, context)
-
-
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /help"""
-    await update.message.reply_text(
-        "📋 Команды бота:\n"
-        "/start - начать работу с ботом\n"
-        "/menu - показать меню\n"
-        "/help - помощь"
-    )
-
-
-async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка команды /menu"""
-    await show_menu(update, context)
-
 
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Вывод меню с кнопками"""
-    keyboard = [
-        [InlineKeyboardButton("🛎 Заказ 🛎", callback_data='order')],
-        [InlineKeyboardButton("ℹ️ Помощь", callback_data='help')]
-    ]
+    """Главное меню"""
+    keyboard = [[InlineKeyboardButton("🛎 Заказ", callback_data='order')],
+                [InlineKeyboardButton("ℹ️ Помощь", callback_data='help')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
+
     if update.message:
         await update.message.reply_text("Выберите опцию:", reply_markup=reply_markup)
-    elif update.callback_query:
+    else:
         await update.callback_query.edit_message_text("Выберите опцию:", reply_markup=reply_markup)
-
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
     await query.answer()
 
     if query.data == 'order':
         await ask_coffee_type(query, context)
     elif query.data == 'help':
-        await query.edit_message_text(
-            "📋 Команды бота:\n"
-            "/start - начать работу с ботом\n"
-            "/menu - показать меню\n"
-            "/help - помощь"
-        )
-    elif query.data == 'pay':
-        await pay(query, context)
+        await query.edit_message_text("📋 Команды бота:\n/start - начать\n/menu - меню\n/help - помощь")
 
 async def ask_coffee_type(query, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("Cappuccino", callback_data='Cappuccino')],
-        [InlineKeyboardButton("Espresso", callback_data='Espresso')],
-        [InlineKeyboardButton("Coffee", callback_data='Coffee')],
-        [InlineKeyboardButton("🔙 Отмена 🔙", callback_data='cancel')]
-    ]
+    """Выбор вида кофе"""
+    keyboard = [[InlineKeyboardButton("Cappuccino", callback_data='Cappuccino')],
+                [InlineKeyboardButton("Espresso", callback_data='Espresso')],
+                [InlineKeyboardButton("Coffee", callback_data='Coffee')],
+                [InlineKeyboardButton("🔙 Отмена", callback_data='cancel')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text("Выберите вид кофе:", reply_markup=reply_markup)
+    await query.edit_message_text("Выберите кофе:", reply_markup=reply_markup)
 
 async def handle_order_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -89,127 +50,119 @@ async def handle_order_callback(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
 
     if query.data == 'cancel':
-        await query.edit_message_text("Заказ отменён.")
         await show_menu(update, context)
         return
 
-    if query.data in ['Cappuccino', 'Espresso', 'Coffee']:
-        user_data[user_id]['coffee'] = query.data
-        await query.edit_message_text(f"Вы выбрали {query.data}.")
-        await ask_sugar(query, context)
+    user_data[user_id]['coffee'] = query.data
+    await ask_cups(query, context)
 
-async def ask_sugar(query, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("Без сахара", callback_data='Без сахара')],
-        [InlineKeyboardButton("1 ложка", callback_data='1 ложка')],
-        [InlineKeyboardButton("2 ложки", callback_data='2 ложки')],
-        [InlineKeyboardButton("3 ложки", callback_data='3 ложки')],
-        [InlineKeyboardButton("🔙 Отмена 🔙", callback_data='cancel')]
-    ]
+async def ask_cups(query, context: ContextTypes.DEFAULT_TYPE):
+    """Выбор количества чашек"""
+    keyboard = [[InlineKeyboardButton("1 чашка", callback_data='1')],
+                [InlineKeyboardButton("2 чашки", callback_data='2')],
+                [InlineKeyboardButton("3 чашки", callback_data='3')],
+                [InlineKeyboardButton("🔙 Назад", callback_data='order')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text("Сколько ложек сахара положить в кофе?", reply_markup=reply_markup)
+    await query.edit_message_text("Сколько чашек заказать?", reply_markup=reply_markup)
 
-async def handle_sugar_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_cups_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
     await query.answer()
 
-    if query.data == 'cancel':
-        await query.edit_message_text("Заказ отменён.")
-        await show_menu(update, context)
+    if query.data == 'order':
+        await ask_coffee_type(query, context)
         return
 
-    if query.data in ['Без сахара', '1 ложка', '2 ложки', '3 ложки']:
-        user_data[user_id]['sugar'] = query.data
-        await ask_payment(query, context)
+    user_data[user_id]['cups'] = int(query.data)
+    await ask_payment(query, context)
 
 async def ask_payment(query, context: ContextTypes.DEFAULT_TYPE):
+    """Оплата"""
     user_id = query.from_user.id
-    keyboard = [
-        [InlineKeyboardButton("Наличные", callback_data='cash')],
-        [InlineKeyboardButton("Онлайн (click на кассе)", callback_data='online')],
-        [InlineKeyboardButton("🔙 Отмена 🔙", callback_data='cancel')]
-    ]
-    if user_id in ADMIN_IDS:  # Кнопка "Пропустить" доступна для обоих администраторов
+    price = 10000 * user_data[user_id]['cups']
+    keyboard = [[InlineKeyboardButton("Наличные", callback_data='cash')],
+                [InlineKeyboardButton("Онлайн", callback_data='online')],
+                [InlineKeyboardButton("🔙 Назад", callback_data='cups')]]
+
+    if user_id in ADMIN_IDS:
         keyboard.append([InlineKeyboardButton("Пропустить оплату", callback_data='skip')])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text("Как будете 💸 оплачивать💸? 3 000 сум 986019010149374", reply_markup=reply_markup)
+    await query.edit_message_text(f"💸 Оплатите {price} сум. Как будете платить? ", reply_markup=reply_markup)
 
 async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка оплаты и отправка заказа админу"""
     query = update.callback_query
     user_id = query.from_user.id
     await query.answer()
 
-    if query.data == 'cancel':
-        await query.edit_message_text("Заказ отменён.")
-        await show_menu(update, context)
+    if query.data == 'cups':
+        await ask_cups(query, context)
         return
 
-    if query.data in ['cash', 'online', 'skip']:
-        payment = 'Наличные' if query.data == 'cash' else 'Онлайн' if query.data == 'online' else 'Пропущено'
-        user_data[user_id]['payment'] = payment
+    payment = 'Наличные' if query.data == 'cash' else 'Онлайн' if query.data == 'online' else 'Пропущено'
+    user_data[user_id]['payment'] = payment
 
-        # Уведомление админу
-        await context.bot.send_message(
-            ADMIN_IDS[0],
-            f"☕️ Новый заказ:\n"
-            f"Клиент: {user_data[user_id]['name']} {user_data[user_id]['surname']}\n"
-            f"Кофе: {user_data[user_id]['coffee']}\n"
-            f"Сахар: {user_data[user_id]['sugar']}\n"
-            f"Оплата: {payment}",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Готово", callback_data=f"ready_{user_id}")],
-                [InlineKeyboardButton("Отменить", callback_data=f"cancel_{user_id}")]
-            ])
-        )
-        
-        await context.bot.send_message(
-            ADMIN_IDS[1],
-            f"☕️ Новый заказ:\n"
-            f"Клиент: {user_data[user_id]['name']} {user_data[user_id]['surname']}\n"
-            f"Кофе: {user_data[user_id]['coffee']}\n"
-            f"Сахар: {user_data[user_id]['sugar']}\n"
-            f"Оплата: {payment}",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Готово", callback_data=f"ready_{user_id}")],
-                [InlineKeyboardButton("Отменить", callback_data=f"cancel_{user_id}")]
-            ])
-        )
+    order_text = (f"☕️ Новый заказ:\n"
+                  f"Клиент: {user_data[user_id]['name']} {user_data[user_id]['surname']}\n"
+                  f"Кофе: {user_data[user_id]['coffee']}\n"
+                  f"Количество: {user_data[user_id]['cups']} чашек\n"
+                  f"Оплата: {payment}")
 
-        # Уведомление пользователю
-        await query.message.reply_text(
-            f"Ваш заказ принят, {user_data[user_id]['name']}! Ваш кофе будет готов через 5 минут. 9860190101149374"
-        )
-        await show_menu(update, context)
+    keyboard = [[InlineKeyboardButton("Готово", callback_data=f"ready_{user_id}")],
+                [InlineKeyboardButton("Отменить", callback_data=f"cancel_{user_id}")],
+                [InlineKeyboardButton("📩 Отправить сообщение", callback_data=f"message_{user_id}")]]
+
+    for admin in ADMIN_IDS:
+        try:
+            await context.bot.send_message(admin, order_text, reply_markup=InlineKeyboardMarkup(keyboard))
+        except Exception as e:
+            print(f"⚠ Ошибка отправки админу {admin}: {e}")
+
+    await query.message.reply_text(f"✅ Ваш заказ принят! Ожидайте ☕️. 9860190101149374")
+    await show_menu(update, context)
 
 async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка действий админа"""
     query = update.callback_query
     data = query.data.split('_')
-    action = data[0]
-    user_id = int(data[1])
+    action, user_id = data[0], int(data[1])
 
     if action == 'ready':
-        await context.bot.send_message(user_id, "😁 Ваш заказ готов! Приятного аппетита ☕️.")
-        await query.answer("Пользователь уведомлён, что заказ готов.")
+        await context.bot.send_message(user_id, "✅ Ваш заказ готов! Приятного аппетита ☕️.")
+        await query.answer("Уведомление отправлено.")
     elif action == 'cancel':
-        await context.bot.send_message(user_id, "😞 Извините, ваш заказ отменён.")
-        await query.answer("Пользователь уведомлён, что заказ отменён.")
+        await context.bot.send_message(user_id, "❌ Ваш заказ отменён.")
+        await query.answer("Уведомление отправлено.")
+    elif action == 'message':
+        pending_messages[query.from_user.id] = user_id
+        await query.message.reply_text("📩 Введите сообщение для клиента:")
+        await query.answer()
+
+async def handle_admin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает ввод сообщения от админа"""
+    admin_id = update.message.from_user.id
+    if admin_id in pending_messages:
+        user_id = pending_messages.pop(admin_id)
+        await context.bot.send_message(user_id, f"📩 Сообщение от администратора:\n{update.message.text}")
+        await update.message.reply_text("✅ Сообщение отправлено!")
+    else:
+        await update.message.reply_text("❌ Ошибка: Вы не выбирали клиента для сообщения.")
 
 def main():
     TOKEN = "7982381260:AAGkAt7u-eEMYtiaYQL17fWgKgs978_3Gpg"
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("menu", menu))
+    app.add_handler(MessageHandler(filters.TEXT & filters.User(ADMIN_IDS), handle_admin_message))
     app.add_handler(CallbackQueryHandler(handle_callback, pattern="^(order|help)$"))
     app.add_handler(CallbackQueryHandler(handle_order_callback, pattern="^(Cappuccino|Espresso|Coffee|cancel)$"))
-    app.add_handler(CallbackQueryHandler(handle_sugar_callback, pattern="^(Без сахара|1 ложка|2 ложки|3 ложки|cancel)$"))
-    app.add_handler(CallbackQueryHandler(handle_payment_callback, pattern="^(cash|online|cancel|skip)$"))
-    app.add_handler(CallbackQueryHandler(admin_callback, pattern="^(ready|cancel)_\\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_cups_callback, pattern="^[123]$"))
+    app.add_handler(CallbackQueryHandler(handle_payment_callback, pattern="^(cash|online|skip|cups)$"))
+    app.add_handler(CallbackQueryHandler(admin_callback, pattern="^(ready|cancel|message)_\\d+$"))
 
-    print("Бот запущен! Нажмите Ctrl+C для остановки.")
+    print("✅ Бот запущен! Нажмите Ctrl + C для отключения ")
     app.run_polling()
 
 if __name__ == "__main__":
